@@ -1,0 +1,64 @@
+---
+- name: Configure Ubuntu Server with NextCloud and Emby
+  hosts: ubuntu_servers
+  become: yes
+  vars:
+    nextcloud_backup_dir: "/var/snap/nextcloud/common/backups"
+    emby_music_directory: "/array/Media/Music"
+
+  tasks:
+    - name: Ensure snap is installed
+      apt:
+        name: snapd
+        state: present
+        update_cache: yes
+
+    - name: Install NextCloud snap
+      snap:
+        name: nextcloud
+        state: present
+
+    - name: Restore the latest NextCloud backup
+      shell: |
+        latest_backup=$(ls -t {{ nextcloud_backup_dir }} | head -n 1)
+        if [ -n "$latest_backup" ]; then
+          nextcloud.restore "$latest_backup"
+        else
+          echo "No backup found in {{ nextcloud_backup_dir }}"
+        fi
+      args:
+        executable: /bin/bash
+      notify:
+        - Restart NextCloud service
+
+    - name: Install Emby server
+      apt:
+        name: emby-server
+        state: present
+        update_cache: yes
+
+    - name: Create the music directory if it doesn't exist
+      file:
+        path: "{{ emby_music_directory }}"
+        state: directory
+        mode: '0755'
+
+    - name: Configure Emby to use the music directory
+      lineinfile:
+        path: /etc/emby-server/config/system.xml
+        regexp: '<LibraryPath>.*?</LibraryPath>'
+        line: "<LibraryPath>{{ emby_music_directory }}</LibraryPath>"
+        create: yes
+      notify:
+        - Restart Emby service
+
+  handlers:
+    - name: Restart NextCloud service
+      service:
+        name: snap.nextcloud.apache
+        state: restarted
+
+    - name: Restart Emby service
+      service:
+        name: emby-server
+        state: restarted
