@@ -1,5 +1,5 @@
 ---
-- name: Configure Ubuntu Server with NextCloud and Emby
+- name: Configure Ubuntu Server with NextCloud, Emby and a bunch of other bits
   hosts: ubuntu_servers
   become: yes
   vars:
@@ -32,16 +32,10 @@
         - Restart NextCloud service
 
     - name: Install Emby server
-      apt:
+      snap:
         name: emby-server
         state: present
         update_cache: yes
-
-    - name: Create the music directory if it doesn't exist
-      file:
-        path: "{{ emby_music_directory }}"
-        state: directory
-        mode: '0755'
 
     - name: Configure Emby to use the music directory
       lineinfile:
@@ -49,8 +43,6 @@
         regexp: '<LibraryPath>.*?</LibraryPath>'
         line: "<LibraryPath>{{ emby_music_directory }}</LibraryPath>"
         create: yes
-      notify:
-        - Restart Emby service
 
   handlers:
     - name: Restart NextCloud service
